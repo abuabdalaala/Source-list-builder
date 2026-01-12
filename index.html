@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة استخراج المصادر والمراجع</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Arabic:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Noto Sans Arabic', sans-serif; background-color: #fdfdfd; padding-bottom: 50px; }
+        
+        .header {
+            background: linear-gradient(135deg, #3E2723, #6D4C41);
+            color: white; 
+            padding: 30px 0; 
+            text-align: center; 
+            margin-bottom: 30px;
+            box-shadow: 0 4px 10px rgba(62, 39, 35, 0.3);
+        }
+        
+        .header-text {
+            font-family: 'Amiri', serif; 
+            font-weight: 700; 
+            font-size: 1.8rem;
+            line-height: 1.6;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        @media (max-width: 400px) {
+            .header-text { font-size: 1.4rem; }
+        }
+
+        .main-card { 
+            background: white; border-radius: 12px; padding: 30px; 
+            max-width: 950px; margin: 0 auto; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+            border-top: 5px solid #3E2723;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .status-bar.loading { color: #d35400; border-color: #f39c12; background: #fdf2e9; }
+        .status-bar.success { color: #27ae60; border-color: #2ecc71; background: #e8f8f5; }
+        .status-bar.error { color: #c0392b; border-color: #e74c3c; background: #fdeaea; }
+
+        .btn-run { 
+            background-color: #3E2723; color: white; padding: 12px 50px; 
+            border-radius: 50px; border: none; width: 100%; font-size: 1.1rem; transition: 0.3s; 
+        }
+        .btn-run:hover:not(:disabled) { background-color: #281815; }
+        
+        .result-row { 
+            background: white; border-right: 5px solid #3E2723; padding: 15px; 
+            margin-bottom: 10px; font-family: 'Amiri', serif; font-size: 1.3rem; 
+            line-height: 1.8; box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        }
+        
+        .not-found-text { color: #c0392b; font-size: 1.1rem; margin-right: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-text">أداة استخراج المصادر والمراجع</div>
+        <div class="header-text">(من الشاملة العادية والذهبية)</div>
+    </div>
+
+    <div class="container">
+        <div class="main-card">
+            
+            <textarea id="badWordsInput" style="display:none;">غير محدد, غير موجود, لا يوجد, بدون, بلا, مجهول, غ.م, د.ن, د.ط, د.ت</textarea>
+
+            <div id="dbStatus" class="status-bar loading">
+                <i class="fas fa-spinner fa-spin me-2"></i> جاري الاتصال بقاعدة البيانات...
+            </div>
+
+            <div class="d-flex justify-content-center gap-4 mb-4 sort-options">
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sortType" id="sortAlpha" value="alpha" checked>
+                    <label class="form-check-label fw-bold" for="sortAlpha">ترتيب ألفبائي (أ ب ت ث)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sortType" id="sortAbjad" value="abjad">
+                    <label class="form-check-label fw-bold" for="sortAbjad">ترتيب أبجدي (أ ب ج د)</label>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="fw-bold mb-2">قائمة الحواشي:</label>
+                <textarea id="inputList" class="form-control" rows="6" placeholder="ألصق هنا"></textarea>
+            </div>
+
+            <button id="btnSearch" class="btn btn-run" onclick="processData()" disabled>
+                <i class="fas fa-search me-2"></i> استخراج المصادر
+            </button>
+            
+            <div class="text-center mt-2 text-muted fw-bold">
+                <small>انتظر قليلا ريثما تُستخرَج المصادر</small>
+            </div>
+
+            <div id="resultsArea" class="mt-5 d-none">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-success">النتائج:</h5>
+                    <button onclick="copyResults()" class="btn btn-dark btn-sm"><i class="fas fa-copy me-2"></i> نسخ الكل</button>
+                </div>
+                <div id="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSV_URL = "https://raw.githubusercontent.com/abuabdalaala/Source-list-builder/main/Comprehensive%20Library%20Book%20Cards%20Database.csv";
+        
+        let DB = [];
+        const abjadOrder = "أبجد هوز حطي كلمن سعفص قرشت ثخذ ضظغ";
+        
+        window.onload = function() {
+            loadDatabaseFromGithub();
+        };
+
+        function loadDatabaseFromGithub() {
+            const statusEl = document.getElementById('dbStatus');
+            Papa.parse(CSV_URL, {
+                download: true, header: false, skipEmptyLines: true,
+                complete: function(res) {
+                    let data = res.data;
+                    if (data.length > 0 && (data[0][0].includes('كتاب') || data[0][0].includes('اسم'))) data.shift();
+                    DB = data;
+                    statusEl.className = 'status-bar success';
+                    statusEl.innerHTML = `<i class="fas fa-check-circle me-2"></i> تم الاتصال بقاعدة البيانات (${DB.length} كتاب)`;
+                    document.getElementById('btnSearch').disabled = false;
+                },
+                error: function(err) {
+                    statusEl.className = 'status-bar error';
+                    statusEl.innerHTML = `<i class="fas fa-times-circle me-2"></i> فشل تحميل البيانات. تأكد من الإنترنت.`;
+                }
+            });
+        }
+
+        function getAbjadVal(char) { let idx = abjadOrder.indexOf(char); return idx === -1 ? 999 : idx; }
+        function strip(s) { return (s||"").replace(/^(ال|آل)\s*/, '').replace(/[^\u0621-\u064A\s]/g, '').trim(); }
+        
+        function squeeze(str) {
+            if (!str) return "";
+            str = str.replace(/^(تح|تحقيق)[:\s]*/, '');
+            return str.replace(/[^\u0621-\u064A\u0660-\u0669a-zA-Z0-9]/g, '');
+        }
+
+        function normalizeArabic(text) {
+            if (!text) return "";
+            return text.replace(/[أإآ]/g, 'ا').replace(/[ى]/g, 'ي').replace(/[ة]/g, 'ه').replace(/[\u064B-\u065F]/g, '').trim();
+        }
+
+        function cleanForMatch(str) {
+            if (!str) return "";
+            let s = str.replace(/[^\u0621-\u064A\s]/g, '') 
+                       .replace(/^(كتاب|رسالة|متن|شرح)\s+/, '') 
+                       .replace(/\s+(ال|آل)/g, ' ') 
+                       .replace(/^(ال|آل)/, '')
+                       .trim();
+            return normalizeArabic(s);
+        }
+
+        function cleanAuthorSmart(str) {
+            if (!str) return "";
+            let s = str.replace(/^(لابن|لأبي|لـ|للـ|ل)/, '')
+                       .replace(/^(الشيخ|الإمام|العلامة|ابن|أبي|أبو)\s+/, '')
+                       .replace(/[^\u0621-\u064A\s]/g, '')
+                       .trim();
+            s = s.replace(/^(ال|آل)/, '');
+            return normalizeArabic(s);
+        }
+
+        function isBad(text) {
+            if (!text) return true;
+            let compressedText = squeeze(text.toString());
+            if (compressedText.length < 1) return true;
+            const rawList = document.getElementById('badWordsInput').value;
+            const badWords = rawList.split(/[,،]/);
+            return badWords.some(bad => {
+                let compressedBad = squeeze(bad);
+                if (compressedBad.length === 0) return false;
+                return compressedText.includes(compressedBad);
+            });
+        }
+
+        function isLikelyFullCitation(line) {
+            let parts = line.split(/[،,-]/);
+            if (parts.length < 3) return false;
+            let text = line.toString();
+            let hasPub = text.includes('دار ') || text.includes('مكتبة') || text.includes('مؤسسة') || text.includes('مطبعة') || text.includes('شركة');
+            let hasEd = text.includes('طبعة') || text.includes('ط.') || text.includes('ط1') || text.includes('ط2');
+            let hasInv = text.includes('تحقيق') || text.includes('تح:');
+            let hasYear = /\d{4}/.test(text); 
+            return (hasPub || hasEd || hasInv || hasYear);
+        }
+
+        function processData() {
+            const txt = document.getElementById('inputList').value;
+            if (!txt.trim()) return alert("أدخل نصاً");
+            
+            const list = document.getElementById('list');
+            document.getElementById('resultsArea').classList.remove('d-none');
+            list.innerHTML = '';
+
+            let finalResults = [];
+            let lines = txt.split(/\r?\n/);
+
+            lines.forEach(line => {
+                line = line.trim();
+                if(line.length < 2) return;
+
+                // 1. الفلاتر الأساسية
+                if (line.includes('أخرجه') || line.includes('رواه')) return;
+                // --- الجديد: تجاهل "المصدر السابق" ---
+                if (line.includes('المصدر السابق') || line.includes('المرجع السابق')) return;
+
+                if (line.includes('الآية') || line.includes('الآيات') || line.includes('الآيتان') || 
+                    line.includes('الاية') || line.includes('الايات') || line.includes('الايتان') ||
+                    line.includes('سورة') || line.includes('تعالى')) return;
+
+                // 2. التنظيف
+                let cleanLine = line.replace(/^([وفل]?)(ينظر|انظر|راجع|حول|طالع)[:\s]*/, '');
+                cleanLine = cleanLine.replace(/^[\s\d\-\.\[\]\(\)\*•:]+/g, '');
+
+                // 3. الفلتر القوي والمعدل لـ "هو"
+                // يحذف إذا بدأ بـ "هو" متبوعة بـ (مسافة، نقطتين، فاصلة، نقطة) أو كانت هي الكلمة الوحيدة
+                if (/^هو([\s:،.]|$)/.test(cleanLine)) return;
+                
+                if (cleanLine.startsWith('ترجمة')) return;
+
+                // 4. هل الحاشية كاملة؟
+                if (isLikelyFullCitation(cleanLine)) {
+                    let formattedLine = cleanLine.replace(/،/g, '، ').replace(/  +/g, ' ');
+                    if (!formattedLine.endsWith('.')) formattedLine += '.';
+                    finalResults.push({
+                        text: formattedLine,
+                        sortKey: strip(cleanLine.split(/[،,-]/)[0]), 
+                        isFound: true
+                    });
+                    return; 
+                }
+
+                // 5. البحث في القاعدة
+                let parts = cleanLine.split(/[،,-]/).map(p => p.trim()).filter(p => p.length > 0);
+                if (parts.length === 0) return;
+
+                let candidates = [];
+                candidates.push({ book: parts[0], author: (parts.length > 1 ? parts[1] : null) });
+                if (parts.length > 1) candidates.push({ book: parts[1], author: parts[0] });
+                if (parts.length > 2) candidates.push({ book: parts[2], author: parts[0] });
+
+                let lineFound = false;
+
+                for (let req of candidates) {
+                    let cleanedBookName = req.book.replace(/[\[\]()]/g, '').trim();
+                    let authorConstraint = req.author;
+
+                    if (cleanedBookName.length < 2) continue;
+                    if (authorConstraint) {
+                        let tempAuth = authorConstraint.replace(/[0-9\/]/g, '').trim();
+                        if (tempAuth.length < 2 || authorConstraint.match(/[\d\/]/) || authorConstraint.includes(' ص ')) {
+                            authorConstraint = null;
+                        }
+                    }
+
+                    const matches = DB.filter(r => {
+                        let dbBookTitle = (r[0]||"").toString();
+                        let dbAuthorName = (r[1]||"").toString();
+                        if (dbBookTitle.length > 70) return false;
+
+                        let qBookClean = cleanForMatch(cleanedBookName);
+                        let dbBookClean = cleanForMatch(dbBookTitle);
+                        if (!qBookClean || !dbBookClean) return false;
+
+                        let titleMatch = false;
+                        if (qBookClean.split(' ').length === 1) titleMatch = (qBookClean === dbBookClean);
+                        else titleMatch = dbBookClean.startsWith(qBookClean);
+
+                        if (!titleMatch) return false;
+
+                        if (authorConstraint) {
+                            let reqAuthNorm = cleanAuthorSmart(authorConstraint); 
+                            let dbAuthNorm = normalizeArabic(dbAuthorName);
+                            let reqTokens = reqAuthNorm.split(/\s+/).filter(w => w.length > 2);
+                            if (reqTokens.length === 0) return true;
+                            return reqTokens.some(token => dbAuthNorm.includes(token));
+                        } else {
+                            return true;
+                        }
+                    });
+
+                    if (matches.length > 0) {
+                        matches.forEach(m => {
+                            finalResults.push({
+                                text: buildRow(m),
+                                sortKey: strip(m[0] || ""),
+                                isFound: true
+                            });
+                        });
+                        lineFound = true;
+                        break; 
+                    }
+                }
+
+                if (!lineFound) {
+                    let dispBook = candidates[0].book;
+                    let dispAuth = candidates[0].author;
+                    if(dispBook.length < 50) {
+                        let disp = dispBook + (dispAuth ? ` (${dispAuth})` : "");
+                        finalResults.push({
+                            text: `<div class="result-row">${disp} <span class="not-found-text">(لم يوجد)</span></div>`,
+                            sortKey: strip(dispBook),
+                            isFound: false
+                        });
+                    }
+                }
+            });
+
+            let uniqueMap = new Map();
+            finalResults.forEach(item => uniqueMap.set(item.text, item));
+            let sortedFinal = Array.from(uniqueMap.values());
+
+            sortedFinal.sort((a, b) => {
+                const type = document.querySelector('input[name="sortType"]:checked').value;
+                if (type === 'alpha') return a.sortKey.localeCompare(b.sortKey, 'ar');
+                else {
+                    let valA = getAbjadVal(a.sortKey.charAt(0));
+                    let valB = getAbjadVal(b.sortKey.charAt(0));
+                    return valA - valB || a.sortKey.localeCompare(b.sortKey, 'ar');
+                }
+            });
+
+            sortedFinal.forEach(item => {
+                if(item.isFound) list.innerHTML += `<div class="result-row">${item.text}</div>`;
+                else list.innerHTML += item.text;
+            });
+        }
+
+        function buildRow(row) {
+            let title = (row[0] || "بدون عنوان").trim();
+            let author = (row[1] || "").trim();
+            let rawInv = (row[2] || "").toString();
+            let rawPub = (row[3] || "").toString();
+            let rawCity = (row[4] || "").toString();
+            let rawEd = (row[5] || "").toString();
+            let rawYear = (row[6] || "").toString();
+
+            let parts = [];
+            parts.push(title);
+            if (!isBad(author)) parts.push(author);
+            if (!isBad(rawInv)) {
+                let cleanInv = rawInv.replace(/[()]/g, '').replace(/^(تح|تحقيق)[:\s]*/, '').trim();
+                parts.push(`تح: ${cleanInv}`);
+            }
+            if (!isBad(rawPub)) parts.push(rawPub);
+            if (!isBad(rawCity)) parts.push(rawCity);
+
+            let isEdMissing = isBad(rawEd);
+            let isYearMissing = isBad(rawYear);
+
+            if (!isEdMissing) {
+                let s = rawEd.trim();
+                if (/^\d+$/.test(s)) parts.push(`ط${s}`);
+                else if (s.includes('الأول')) parts.push('ط1');
+                else parts.push(s);
+                parts.push(isYearMissing ? "د.ت" : rawYear.trim());
+            } else {
+                parts.push(isYearMissing ? "د.ت" : rawYear.trim());
+                parts.push("د.ط");
+            }
+
+            let finalStr = parts.join('، ') + ".";
+            return finalStr.replace(/تح:\s*،/g, '،');
+        }
+
+        async function copyResults() {
+            const list = document.getElementById('list');
+            if (!list || list.innerText.trim() === "") {
+                alert("لا توجد نتائج للنسخ");
+                return;
+            }
+            const textToCopy = list.innerText;
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                alert("تم النسخ بنجاح!");
+            } catch (err) {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("تم النسخ بنجاح!");
+                } catch (err) {
+                    alert("فشل النسخ، يرجى النسخ يدوياً.");
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+    </script>
+</body>
+</html>
